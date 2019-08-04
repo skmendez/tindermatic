@@ -15,11 +15,6 @@
     <script src="https://unpkg.com/d3-shape@1"></script>
     <script src="https://unpkg.com/d3-sankey@0"></script>
     <style>
-        .link {
-            fill: none;
-            stroke: #000;
-            stroke-opacity: .2;
-        }
         .link:hover {
             stroke-opacity: .5;
         }
@@ -33,9 +28,9 @@
 
         #play-button {
             position: absolute;
-            top: 140px;
+            top: 50px;
             left: 50px;
-            background: #f08080;
+            background: #FC8371;
             padding-right: 26px;
             border-radius: 3px;
             border: none;
@@ -88,7 +83,7 @@
     </style>
 </head>
 <body>
-    <input type="file" id="files" name="files[]" />
+    <input type="file" id="files"  accept=".zip,.json" />
     <!-- Create a div where the graph will take place -->
     <div id="my_dataviz">
         <button id="play-button">Play</button>

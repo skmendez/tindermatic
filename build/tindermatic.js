@@ -10,18 +10,14 @@ const format = d3.format(",.0f");
 let svg = d3.select("#my_dataviz")
     .append("svg")
     .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
+    .attr("height", height + margin.top + margin.bottom);
+
+svg.append("g")
+    .attr("class", "sankey")
     .attr("transform",
         "translate(" + margin.left + "," + margin.top + ")");
 
 let x = 0;
-
-function update() {
-    x++;
-    let graph = createGraph(dataTemp[x][1]);
-    createSankey(graph);
-}
 
 let sankey = d3.sankey()
     .nodeId(d => d.name)
@@ -29,23 +25,23 @@ let sankey = d3.sankey()
     .nodeWidth(15)
     .nodePadding(10)
     .nodeSort(null)
-    .extent([[0, 5], [width, height - 5]])
+    .size([width, height])
     .iterations(128);
 
 function handleFileSelect(evt) {
-    let f = evt.target.files[0];
-    let p = getJsonPromise(f);
-    p.then(function (json) {
+    let f = Promise.resolve(evt.target.files[0]);
+    f.then(getJsonPromise)
+     .then(function (json) {
         let output = processData(json);
         dataTemp = processDataTemporal(json);
         let graph = createGraph(Array.from(dataTemp)[0][1]);
         createSankey(graph);
         createSlider(dataTemp);
-    });
+    }).catch((e) => console.log(`Error in Promise ${e}`));
 }
 
 function createSlider(dataTemp) {
-    var formatDateIntoYear = d3.timeFormat("%Y");
+    var formatDateIntoYear = d3.timeFormat("%b %Y");
     var formatDate = d3.timeFormat("%b %Y");
     var parseDate = d3.timeParse("%m/%d/%y");
 
@@ -105,13 +101,13 @@ function createSlider(dataTemp) {
         .attr("class", "ticks")
         .attr("transform", "translate(0," + 18 + ")")
         .selectAll("text")
-        .data(x.ticks(10))
+        .data(x.ticks(8))
         .enter()
         .append("text")
         .attr("x", x)
         .attr("y", 10)
         .attr("text-anchor", "middle")
-        .text(function(d) { return formatDateIntoYear(d); });
+        .text(d => formatDateIntoYear(d));
 
     var handle = slider.insert("circle", ".track-overlay")
         .attr("class", "handle")
@@ -124,17 +120,19 @@ function createSlider(dataTemp) {
         .attr("transform", "translate(0," + (-25) + ")")
 
     // Play Button time
+    let timer;
 
     playButton
         .on("click", function() {
             var button = d3.select(this);
-            if (button.text() == "Pause") {
+            if (button.text() === "Pause") {
                 moving = false;
                 clearInterval(timer);
                 // timer = 0;
                 button.text("Play");
             } else {
                 moving = true;
+                if (currentValue >= targetValue) currentValue = 0;
                 timer = setInterval(step, 100);
                 button.text("Pause");
             }
@@ -142,19 +140,18 @@ function createSlider(dataTemp) {
         });
 
     function step() {
-        let curDate = x.invert(currentValue);
-        updateSlider(curDate);
-        let nextDate = d3.timeDay.offset(d3.timeDay.floor(curDate));
-        currentValue = x(nextDate);
-        console.log(nextDate);
         if (currentValue >= targetValue) {
-            updateSlider(nextDate);
             moving = false;
             currentValue = 0;
             clearInterval(timer);
             // timer = 0;
             playButton.text("Play");
             console.log("Slider moving: " + moving);
+        } else {
+            let curDate = x.invert(currentValue);
+            let nextDate = d3.timeDay.offset(d3.timeDay.floor(curDate));
+            currentValue = x(nextDate);
+            updateSlider(curDate);
         }
     }
 
@@ -200,8 +197,7 @@ function createSankey(graph, time) {
     let t = svg.transition()
         .duration(time || 500).ease(d3.easeLinear);
 
-    let types = ["rect", "link", "text"];
-    svg.selectAll("g.parent").data(types).join("g").attr("class", "parent").attr("id", d => d);;
+    svg.select("g.sankey").selectAll("g.sankey > g").data(["rect", "link", "text"]).join("g").attr("id", d => d);
     svg.select("g#rect")
         .selectAll("rect")
         .data(graph.nodes, d => d.name)
@@ -251,7 +247,7 @@ function createSankey(graph, time) {
     function linkEnter(link) {
         link = link.append("g");
 
-        link.attr("stroke", d => d3.color(d.color))
+        link.attr("stroke", d => d3.color(d.color).brighter(1))
             .style("mix-blend-mode", "multiply");
 
         link.append("path")
@@ -298,23 +294,11 @@ function createSankey(graph, time) {
             .attr("x", d => d.x1 + 6)
             .attr("y", d => (d.y1 + d.y0) / 2)
           .select("tspan")
-            .tween("text", function(d) {
+            .attrTween("text", function(d) {
                 const that = d3.select(this),
                     i = d3.interpolateNumber(that.text().replace(/,/g, ""), d.value);
                 return function(t) { that.text(` ${format(i(t))}`); };
             });
-    }
-
-    // the function for moving the nodes
-    function dragmove(d) {
-        d3.select(this)
-            .attr("transform",
-                "translate("
-                + d.x + ","
-                + (d.y = Math.max(
-                    0, Math.min(height - d.dy, d3.event.y))
-                ) + ")");
-        link.attr("d", d3.sankeyLinkHorizontal());
     }
 
     return t.end().catch(Function.prototype);
