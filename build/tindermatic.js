@@ -38,28 +38,23 @@ function handleFileSelect(evt) {
     p.then(function (json) {
         let output = processData(json);
         dataTemp = processDataTemporal(json);
-        let graph = createGraph(dataTemp[0][1]);
+        let graph = createGraph(Array.from(dataTemp)[0][1]);
         createSankey(graph);
-        createSlider();
+        createSlider(dataTemp);
     });
 }
 
-function createSlider(startDate, endDate) {
+function createSlider(dataTemp) {
     var formatDateIntoYear = d3.timeFormat("%Y");
     var formatDate = d3.timeFormat("%b %Y");
     var parseDate = d3.timeParse("%m/%d/%y");
 
-    var startDate = new Date("2004-11-01"),
-        endDate = new Date("2017-04-01");
+    var startDate = new Date(Array.from(dataTemp.keys())[0]),
+        endDate = new Date(Array.from(dataTemp.keys())[dataTemp.size-1]);
 
     var margin = {top:50, right:50, bottom:0, left:50},
         width = 960 - margin.left - margin.right,
         height = 500 - margin.top - margin.bottom;
-
-    var svg = d3.select("#my_dataviz")
-        .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom);
 
     ////////// slider //////////
 
@@ -102,10 +97,11 @@ function createSlider(startDate, endDate) {
             .text(formatDate(h));
 
         // filter data set and redraw plot
-        var newData = dataset.filter(function(d) {
-            return d.date < h;
-        })
-        drawPlot(newData);
+        var newDate = d3.timeDay.floor(h);
+        var data = dataTemp.get(newDate.toJSON());
+        var graph = createGraph(data);
+
+        createSankey(graph).catch(console.log);
     }
 
     slider.insert("g", ".track-overlay")
@@ -360,10 +356,10 @@ function processDataTemporal(data) {
             messaged: message_finder(messages_date, day),
             multiple: message_finder(multiple_messages, day)
         };
-        out.push([day, vals]);
+        out.push([day.toJSON(), vals]);
         }
     );
-    return out;
+    return new Map(out);
 }
 
 function processData(data) {
