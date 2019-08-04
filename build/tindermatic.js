@@ -52,9 +52,6 @@ function createSlider(dataTemp) {
     var startDate = new Date(Array.from(dataTemp.keys())[0]),
         endDate = new Date(Array.from(dataTemp.keys())[dataTemp.size-1]);
 
-    var margin = {top:50, right:50, bottom:0, left:50},
-        width = 960 - margin.left - margin.right,
-        height = 500 - margin.top - margin.bottom;
 
     ////////// slider //////////
 
@@ -125,6 +122,42 @@ function createSlider(dataTemp) {
         .attr("text-anchor", "middle")
         .text(formatDate(startDate))
         .attr("transform", "translate(0," + (-25) + ")")
+
+    // Play Button time
+
+    playButton
+        .on("click", function() {
+            var button = d3.select(this);
+            if (button.text() == "Pause") {
+                moving = false;
+                clearInterval(timer);
+                // timer = 0;
+                button.text("Play");
+            } else {
+                moving = true;
+                timer = setInterval(step, 100);
+                button.text("Pause");
+            }
+            console.log("Slider moving: " + moving);
+        });
+
+    function step() {
+        let curDate = x.invert(currentValue);
+        updateSlider(curDate);
+        let nextDate = d3.timeDay.offset(d3.timeDay.floor(curDate));
+        currentValue = x(nextDate);
+        console.log(nextDate);
+        if (currentValue >= targetValue) {
+            updateSlider(nextDate);
+            moving = false;
+            currentValue = 0;
+            clearInterval(timer);
+            // timer = 0;
+            playButton.text("Play");
+            console.log("Slider moving: " + moving);
+        }
+    }
+
 }
 
 function createGraph(data) {
@@ -284,7 +317,7 @@ function createSankey(graph, time) {
         link.attr("d", d3.sankeyLinkHorizontal());
     }
 
-    return t.end();
+    return t.end().catch(Function.prototype);
 
 }
 
