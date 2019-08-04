@@ -15,9 +15,6 @@ let svg = d3.select("#my_dataviz")
     .attr("transform",
         "translate(" + margin.left + "," + margin.top + ")");
 
-let t = svg.transition()
-    .duration(1000).ease(d3.easeLinear);
-
 let x = 0;
 
 function update() {
@@ -32,7 +29,8 @@ let sankey = d3.sankey()
     .nodeWidth(15)
     .nodePadding(10)
     .nodeSort(null)
-    .extent([[0, 5], [width, height - 5]]);
+    .extent([[0, 5], [width, height - 5]])
+    .iterations(128);
 
 function handleFileSelect(evt) {
     let f = evt.target.files[0];
@@ -42,9 +40,96 @@ function handleFileSelect(evt) {
         dataTemp = processDataTemporal(json);
         let graph = createGraph(dataTemp[0][1]);
         createSankey(graph);
+        createSlider();
     });
 }
 
+function createSlider(startDate, endDate) {
+    var formatDateIntoYear = d3.timeFormat("%Y");
+    var formatDate = d3.timeFormat("%b %Y");
+    var parseDate = d3.timeParse("%m/%d/%y");
+
+    var startDate = new Date("2004-11-01"),
+        endDate = new Date("2017-04-01");
+
+    var margin = {top:50, right:50, bottom:0, left:50},
+        width = 960 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+
+    var svg = d3.select("#my_dataviz")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom);
+
+    ////////// slider //////////
+
+    var moving = false;
+    var currentValue = 0;
+    var targetValue = width;
+
+    var playButton = d3.select("#play-button");
+
+    var x = d3.scaleTime()
+        .domain([startDate, endDate])
+        .range([0, targetValue])
+        .clamp(true);
+
+    var slider = svg.append("g")
+        .attr("class", "slider")
+        .attr("transform", "translate(" + margin.left + "," + height/5 + ")");
+
+    slider.append("line")
+        .attr("class", "track")
+        .attr("x1", x.range()[0])
+        .attr("x2", x.range()[1])
+        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-inset")
+        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-overlay")
+        .call(d3.drag()
+            .on("start.interrupt", function() { slider.interrupt(); })
+            .on("start drag", function() {
+                currentValue = d3.event.x;
+                updateSlider(x.invert(currentValue));
+            })
+        );
+
+    function updateSlider(h) {
+        // update position and text of label according to slider scale
+        handle.attr("cx", x(h));
+        label
+            .attr("x", x(h))
+            .text(formatDate(h));
+
+        // filter data set and redraw plot
+        var newData = dataset.filter(function(d) {
+            return d.date < h;
+        })
+        drawPlot(newData);
+    }
+
+    slider.insert("g", ".track-overlay")
+        .attr("class", "ticks")
+        .attr("transform", "translate(0," + 18 + ")")
+        .selectAll("text")
+        .data(x.ticks(10))
+        .enter()
+        .append("text")
+        .attr("x", x)
+        .attr("y", 10)
+        .attr("text-anchor", "middle")
+        .text(function(d) { return formatDateIntoYear(d); });
+
+    var handle = slider.insert("circle", ".track-overlay")
+        .attr("class", "handle")
+        .attr("r", 9);
+
+    var label = slider.append("text")
+        .attr("class", "label")
+        .attr("text-anchor", "middle")
+        .text(formatDate(startDate))
+        .attr("transform", "translate(0," + (-25) + ")")
+}
 
 function createGraph(data) {
     let n = new Map([
@@ -80,9 +165,11 @@ function createGraph(data) {
     })
 }
 
-function createSankey(graph) {
+function createSankey(graph, time) {
     sankey(graph);
-    console.log(graph);
+
+    let t = svg.transition()
+        .duration(time || 500).ease(d3.easeLinear);
 
     let types = ["rect", "link", "text"];
     svg.selectAll("g.parent").data(types).join("g").attr("class", "parent").attr("id", d => d);;
@@ -189,8 +276,6 @@ function createSankey(graph) {
             });
     }
 
-
-
     // the function for moving the nodes
     function dragmove(d) {
         d3.select(this)
@@ -203,44 +288,8 @@ function createSankey(graph) {
         link.attr("d", d3.sankeyLinkHorizontal());
     }
 
-}
+    return t.end();
 
-function updateSankey(graph) {
-    sankey(graph);
-
-    svg.selectAll(".link")
-        .data(graph.links, function(d) { return d.id; })
-        .sort(function(a, b) {
-            return b.dy - a.dy;
-        })
-        .transition()
-        .duration(1300)
-        .attr("d", path)
-        .style("stroke-width", function(d) {
-            return Math.max(1, d.dy) + "px";
-        });
-
-    svg.selectAll(".node")
-        .data(graph.nodes, function(d) { return d.name; })
-        .transition()
-        .duration(1300)
-        .attr("transform", function(d) {
-            return "translate(" + d.x + "," + d.y + ")";
-        });
-
-    svg.selectAll(".node rect")
-        .transition()
-        .duration(1300)
-        .attr("height", function(d) {
-            return d.dy;
-        });
-
-    svg.selectAll(".node text")
-        .transition()
-        .duration(1300)
-        .attr("y", function(d) {
-            return d.dy / 2;
-        });
 }
 
 function getJsonPromise(file) {
