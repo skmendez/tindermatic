@@ -1,6 +1,6 @@
 let dataTemp;
 
-const margin = {top: 10, right: 10, bottom: 10, left: 10},
+const margin = {top: 110, right: 120, bottom: 10, left: 10},
     width = 650 - margin.left - margin.right,
     height = 550 - margin.top - margin.bottom;
 
@@ -41,9 +41,8 @@ function handleFileSelect(evt) {
 }
 
 function createSlider(dataTemp) {
-    var formatDateIntoYear = d3.timeFormat("%b %Y");
-    var formatDate = d3.timeFormat("%b %Y");
-    var parseDate = d3.timeParse("%m/%d/%y");
+    var formatDateTick = d3.timeFormat("%b %Y");
+    var formatDate = d3.timeFormat("%d %b %Y");
 
     var startDate = new Date(Array.from(dataTemp.keys())[0]),
         endDate = new Date(Array.from(dataTemp.keys())[dataTemp.size-1]);
@@ -53,9 +52,7 @@ function createSlider(dataTemp) {
 
     var moving = false;
     var currentValue = 0;
-    var targetValue = width;
-
-    var playButton = d3.select("#play-button");
+    var targetValue = width - 30;
 
     var x = d3.scaleTime()
         .domain([startDate, endDate])
@@ -64,7 +61,7 @@ function createSlider(dataTemp) {
 
     var slider = svg.append("g")
         .attr("class", "slider")
-        .attr("transform", "translate(" + margin.left + "," + height/5 + ")");
+        .attr("transform", "translate(" + (margin.left+40) + "," + 50 + ")");
 
     slider.append("line")
         .attr("class", "track")
@@ -107,11 +104,46 @@ function createSlider(dataTemp) {
         .attr("x", x)
         .attr("y", 10)
         .attr("text-anchor", "middle")
-        .text(d => formatDateIntoYear(d));
+        .text(d => formatDateTick(d));
 
     var handle = slider.insert("circle", ".track-overlay")
         .attr("class", "handle")
         .attr("r", 9);
+
+    var playPause = slider.append("g").attr("transform", "translate(-27,0)");
+
+    playPause.append("circle")
+        .attr("class", "handle")
+        .attr("r", 13);
+
+    let states = {playing: "M11,10 L17,10 17,26 11,26 M20,10 L26,10 26,26 20,26",
+        paused:  "M11,10 L18,13.74 18,22.28 11,26 M18,13.74 L26,18 26,18 18,22.28"};
+
+    playPause.append("path")
+        .attr("class", "icon")
+        .attr("d", states.paused)
+        .attr("transform", "translate(-18.5,-18)");
+
+    playPause.on("click", flipState);
+
+    let currentState = "paused";
+
+    function flipState() {
+        console.log(currentState);
+        currentState = (currentState === "paused") ? "playing" : "paused";
+        playPause.select("path.icon").transition().duration(300).attr("d", states[currentState]);
+
+        if (currentState === "paused") {
+            moving = false;
+            clearInterval(timer);
+            // timer = 0;
+        } else {
+            moving = true;
+            if (currentValue >= targetValue) currentValue = 0;
+            timer = setInterval(step, 100);
+        }
+        console.log("Slider moving: " + moving);
+    }
 
     var label = slider.append("text")
         .attr("class", "label")
@@ -122,22 +154,6 @@ function createSlider(dataTemp) {
     // Play Button time
     let timer;
 
-    playButton
-        .on("click", function() {
-            var button = d3.select(this);
-            if (button.text() === "Pause") {
-                moving = false;
-                clearInterval(timer);
-                // timer = 0;
-                button.text("Play");
-            } else {
-                moving = true;
-                if (currentValue >= targetValue) currentValue = 0;
-                timer = setInterval(step, 100);
-                button.text("Pause");
-            }
-            console.log("Slider moving: " + moving);
-        });
 
     function step() {
         if (currentValue >= targetValue) {
@@ -145,7 +161,8 @@ function createSlider(dataTemp) {
             currentValue = 0;
             clearInterval(timer);
             // timer = 0;
-            playButton.text("Play");
+            currentState = "paused";
+            playPause.select("path.icon").transition().duration(300).attr("d", states[currentState]);
             console.log("Slider moving: " + moving);
         } else {
             let curDate = x.invert(currentValue);
@@ -358,10 +375,10 @@ function processDataTemporal(data) {
     const lastDay = d3.timeDay.offset(messages_date.reduce((max, v) => v > max ? v : max), 1);
     const dayRange = d3.timeDay.range(firstDay, lastDay);
     function cumsum_finder(cum_arr, date) {
-        return cum_arr.find(([in_date, count]) => in_date <= date)[1]
+        return cum_arr.find(([in_date]) => in_date <= date)[1]
     }
     function message_finder(msg_arr, date) {
-        return msg_arr.filter((v) =>  v <= date).length
+        return msg_arr.filter(v => v <= date).length
     }
 
     let out = [];
@@ -380,8 +397,6 @@ function processDataTemporal(data) {
 }
 
 function processData(data) {
-
-
     function sum(array) {
         return array.reduce((total, curr) => total + curr, 0)
     }
